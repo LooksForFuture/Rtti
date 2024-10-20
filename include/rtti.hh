@@ -22,42 +22,75 @@
  * SOFTWARE.
  */
 
-#pragma once
+/*
+ * MIT License
+ * Hi Everyone. I am Armin Niknami aka LooksForFuture.
+ * I have just editted this library to be able to run it with visual studio.
+ * So, it's still MIT License as how it has been stated above.
+ */
+
+#ifndef Z_RTTI
+#define Z_RTTI
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <type_traits>
 
-#include "hash.hh"
+#include <string_view>
+#include <cstdint>
+
+namespace Hash {
+    /**
+     * Calculates the 32bit FNV1a hash of a c-string literal.
+     * @param str String literal to be hashed
+     * @param n Length of the string.
+     * @return Calculated hash of the string
+     */
+    static constexpr std::uint32_t FNV1a(const char* str, std::size_t n, std::uint32_t hash = UINT32_C(2166136261)) {
+        return n == 0 ? hash : FNV1a(str + 1, n - 1, (hash ^ str[0]) * UINT32_C(19777619));
+    }
+
+    /**
+     * Calculates the 32bit FNV1a hash of a std::string_view literal.
+     * note: Requires string_view to be a literal in order to be evaluated during compile time!
+     * @param str String literal to be hashed
+     * @return Calculated hash of the string
+     */
+    static constexpr std::uint32_t FNV1a(std::string_view str) {
+        return FNV1a(str.data(), str.size());
+    }
+}
 
 namespace RTTI {
     template <typename T>
     constexpr std::string_view TypeName();
-    
+
     template <>
     constexpr std::string_view TypeName<void>()
-    { return "void"; }
+    {
+        return "void";
+    }
 
-    namespace Detail { 
+    namespace Detail {
         template <typename T>
-        constexpr std::string_view WrappedTypeName()  {
-        #ifdef __clang__
+        constexpr std::string_view WrappedTypeName() {
+#ifdef __clang__
             return __PRETTY_FUNCTION__;
-        #elif defined(__GNUC__)
+#elif defined(__GNUC__)
             return __PRETTY_FUNCTION__;
-        #else
-            #error "Unsupported compiler"
-        #endif
+#else
+            return __FUNCSIG__;
+#endif
         }
 
-        constexpr std::size_t WrappedTypeNamePrefixLength() { 
-            return WrappedTypeName<void>().find(TypeName<void>()); 
+        constexpr std::size_t WrappedTypeNamePrefixLength() {
+            return WrappedTypeName<void>().find(TypeName<void>());
         }
-        
-        constexpr std::size_t WrappedTypeNameSuffixLength() { 
-            return WrappedTypeName<void>().length() 
-                - WrappedTypeNamePrefixLength() 
+
+        constexpr std::size_t WrappedTypeNameSuffixLength() {
+            return WrappedTypeName<void>().length()
+                - WrappedTypeNamePrefixLength()
                 - TypeName<void>().length();
         }
     }
@@ -86,11 +119,11 @@ namespace RTTI {
 
         /// Ensure all passed parents are basses of this type.
         static_assert((... && std::is_base_of<Parents, This>::value),
-                      "One or more parents are not a base of this type.");
+            "One or more parents are not a base of this type.");
 
         /// Ensure all passed parent hierarchies have RTTI enabled.
         static_assert((... && std::is_base_of<Enable, Parents>::value),
-                      "One or more parent hierarchies is not based on top of RTTI::Enable.");
+            "One or more parent hierarchies is not based on top of RTTI::Enable.");
 
         /**
          * Returns the type string of the type T.
@@ -139,13 +172,13 @@ namespace RTTI {
             // The current type does not match, recursively invoke the method
             // for all directly related parent types.
             std::array<void const*, sizeof...(Parents)> ptrs = {
-                Parents::TypeInfo::DynamicCast(typeId, ptr)...};
+                Parents::TypeInfo::DynamicCast(typeId, ptr)... };
 
             // Check whether the traversal up the dependency hierarchy returned a pointer
             // that is not null.
             auto it = std::find_if(ptrs.begin(), ptrs.end(), [](void const* ptr) {
                 return ptr != nullptr;
-            });
+                });
             return (it != ptrs.end()) ? *it : nullptr;
         }
     };
@@ -239,3 +272,5 @@ protected:                                                                      
     [[nodiscard]] virtual void const* _cast(RTTI::TypeId typeId) const noexcept override { \
         return TypeInfo::Is(typeId) ? TypeInfo::DynamicCast(typeId, this) : nullptr;       \
     }
+
+#endif
